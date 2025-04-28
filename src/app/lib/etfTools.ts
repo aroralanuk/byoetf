@@ -225,3 +225,70 @@ export const calculateEtfPerformanceTool = tool({
     }
   },
 });
+
+// "2025-03-11": {\n' +
+//  "1. open": "94.9800",\n' +
+//  "2. high": "95.3800",\n' +
+//  "3. low": "93.5800",\n' +
+//  "4. close": "94.7300",\n' +
+//  "5. volume": "21734793"\n' + }
+export const AlphaVantageDailyPriceSchema = z.object({
+  date: z.string(),
+  open: z.number(),
+  high: z.number(),
+  low: z.number(),
+  close: z.number(),
+  volume: z.number(),
+});
+
+// Parse Alpha Vantage API response into AlphaVantageDailyPriceSchema objects
+export function parseAlphaVantageResponse(
+  data: any
+): Record<string, z.infer<typeof AlphaVantageDailyPriceSchema>[]> {
+  console.log("data", data);
+  if (!data || typeof data !== "object") {
+    console.warn("Invalid Alpha Vantage response data");
+    return {};
+  }
+
+  try {
+    // Extract ticker symbol from meta data
+    const metaData = data["Meta Data"];
+    const ticker =
+      metaData && metaData["2. Symbol"] ? metaData["2. Symbol"] : "UNKNOWN";
+
+    // Get time series data
+    const timeSeriesData = data["Time Series (Daily)"];
+    if (!timeSeriesData || typeof timeSeriesData !== "object") {
+      console.warn(`No time series data found for ${ticker}`);
+      return { [ticker]: [] };
+    }
+
+    // Parse each date entry
+    const prices: z.infer<typeof AlphaVantageDailyPriceSchema>[] = [];
+
+    for (const date in timeSeriesData) {
+      if (Object.prototype.hasOwnProperty.call(timeSeriesData, date)) {
+        const dayData = timeSeriesData[date];
+
+        // Parse numeric values, handling possible string format
+        prices.push({
+          date,
+          open: parseFloat(dayData["1. open"]),
+          high: parseFloat(dayData["2. high"]),
+          low: parseFloat(dayData["3. low"]),
+          close: parseFloat(dayData["4. close"]),
+          volume: parseFloat(dayData["5. volume"]),
+        });
+      }
+    }
+
+    // Sort by date ascending
+    prices.sort((a, b) => a.date.localeCompare(b.date));
+
+    return { [ticker]: prices };
+  } catch (error) {
+    console.error("Error parsing Alpha Vantage response:", error);
+    return {};
+  }
+}
